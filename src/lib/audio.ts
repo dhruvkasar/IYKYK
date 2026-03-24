@@ -78,24 +78,76 @@ export const playHint = () => {
   });
 };
 
-let bgmAudio: HTMLAudioElement | null = null;
+let bgmTimerID: number | null = null;
+let nextNoteTime = 0;
+let currentNote = 0;
 export let isPlayingBgm = false;
 
-export const toggleBgm = () => {
-  if (!bgmAudio) {
-    // Using "Sneaky Snitch" by Kevin MacLeod (Royalty-Free / CC-BY)
-    // Hosted on Internet Archive for reliable cross-browser MP3 streaming
-    bgmAudio = new Audio('https://archive.org/download/KevinMacLeod-SneakySnitch/Kevin%20MacLeod%20-%20Sneaky%20Snitch.mp3');
-    bgmAudio.crossOrigin = "anonymous";
-    bgmAudio.loop = true;
-    bgmAudio.volume = 0.3;
+// Mysterious 8-bit arpeggio (A minor)
+const bgmNotes = [
+  220.00, 261.63, 329.63, 440.00,
+  392.00, 329.63, 261.63, 246.94,
+  220.00, 261.63, 329.63, 440.00,
+  493.88, 440.00, 329.63, 261.63
+];
+
+const scheduleNote = (freq: number, time: number) => {
+  if (!ctx || freq === 0) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  
+  // 'square' gives it that retro 8-bit sound
+  osc.type = 'square';
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  
+  osc.frequency.value = freq;
+  
+  // Envelope to make it sound plucky
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(0.03, time + 0.02); // Low volume
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+  
+  osc.start(time);
+  osc.stop(time + 0.15);
+};
+
+const scheduler = () => {
+  if (!ctx || !isPlayingBgm) return;
+  
+  // Schedule notes slightly ahead of time
+  while (nextNoteTime < ctx.currentTime + 0.1) {
+    scheduleNote(bgmNotes[currentNote], nextNoteTime);
+    nextNoteTime += 0.2; // Speed of the arpeggio (lower is faster)
+    currentNote = (currentNote + 1) % bgmNotes.length;
+  }
+  
+  bgmTimerID = window.setTimeout(scheduler, 25.0);
+};
+
+export const toggleBgm = async (): Promise<boolean> => {
+  if (!ctx) {
+    initAudio();
+  }
+  
+  if (ctx && ctx.state === 'suspended') {
+    await ctx.resume();
   }
   
   if (isPlayingBgm) {
-    bgmAudio.pause();
     isPlayingBgm = false;
+    if (bgmTimerID !== null) {
+      window.clearTimeout(bgmTimerID);
+      bgmTimerID = null;
+    }
+    return false;
   } else {
-    bgmAudio.play().catch(e => console.error("Audio play failed:", e));
     isPlayingBgm = true;
+    if (ctx) {
+      nextNoteTime = ctx.currentTime + 0.05;
+      currentNote = 0;
+      scheduler();
+    }
+    return true;
   }
 };

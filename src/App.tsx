@@ -75,9 +75,9 @@ function App() {
   const [chances, setChances] = useState(3);
   const [openCreator, setOpenCreator] = useState<string | null>(null);
 
-  const handleToggleBgm = () => {
-    toggleBgm();
-    setBgmOn(isPlayingBgm);
+  const handleToggleBgm = async () => {
+    const isPlaying = await toggleBgm();
+    setBgmOn(isPlaying);
   };
 
   const startGame = async () => {
@@ -125,11 +125,27 @@ function App() {
     const normalizedUser = userAnswer.toLowerCase().trim();
     const normalizedActual = currentRiddle.answer.toLowerCase().trim();
     
-    // Remove punctuation and spaces for a more forgiving check
-    const cleanUser = normalizedUser.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()\s]/g,"");
-    const cleanActual = normalizedActual.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()\s]/g,"");
+    // Remove punctuation
+    const cleanUser = normalizedUser.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
+    const cleanActual = normalizedActual.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
 
-    const isCorrect = cleanUser.includes(cleanActual) || cleanActual.includes(cleanUser);
+    // Remove common articles for comparison
+    const removeArticles = (str: string) => str.replace(/^(a|an|the)\s+/g, "").replace(/\s+/g, "");
+    
+    const userNoArticles = removeArticles(cleanUser);
+    const actualNoArticles = removeArticles(cleanActual);
+
+    // Check exact match after removing articles and spaces
+    let isCorrect = userNoArticles === actualNoArticles;
+    
+    // If not exact, check if one contains the other (only if the word is reasonably long to prevent false positives)
+    if (!isCorrect) {
+      if (actualNoArticles.length >= 3 && userNoArticles.includes(actualNoArticles)) {
+        isCorrect = true;
+      } else if (userNoArticles.length >= 3 && actualNoArticles.includes(userNoArticles)) {
+        isCorrect = true;
+      }
+    }
 
     if (isCorrect) {
       playCorrect();
@@ -306,9 +322,10 @@ function App() {
 
                 <button
                   onClick={startGame}
-                  className="w-full py-4 bg-mint text-emerald-900 text-xl font-extrabold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
+                  disabled={loading}
+                  className="w-full py-4 bg-mint text-emerald-900 text-xl font-extrabold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  PLAY NOW <ArrowRight />
+                  {loading ? 'LOADING...' : 'PLAY NOW'} <ArrowRight />
                 </button>
               </div>
             </motion.div>
@@ -382,7 +399,8 @@ function App() {
                           />
                           <button 
                             type="submit"
-                            className="absolute right-2 top-2 bottom-2 px-4 md:px-6 bg-violet text-white font-bold rounded-full border-2 border-ink hover:bg-violet/90 transition-all active:scale-95 text-sm md:text-base"
+                            disabled={!userAnswer.trim()}
+                            className="absolute right-2 top-2 bottom-2 px-4 md:px-6 bg-violet text-white font-bold rounded-full border-2 border-ink hover:bg-violet/90 transition-all active:scale-95 text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Submit
                           </button>
@@ -391,7 +409,11 @@ function App() {
                         <div className="flex flex-wrap justify-between items-center gap-4 mt-2">
                           <button
                             type="button"
-                            onClick={() => setGameState('menu')}
+                            onClick={() => {
+                              setChances(0);
+                              setStreak(0);
+                              setGameState('failed');
+                            }}
                             className="text-sm font-bold text-ink/60 hover:text-ink underline underline-offset-4"
                           >
                             Give up
@@ -435,7 +457,7 @@ function App() {
                           {currentRiddle.fun_fact}
                         </p>
                         
-                        <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <div className="flex flex-col sm:flex-row gap-3 w-full mb-4">
                           <button
                             onClick={shareRiddle}
                             className="flex-1 py-4 bg-white text-ink text-lg font-bold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
@@ -449,6 +471,12 @@ function App() {
                             NEXT RIDDLE <ArrowRight />
                           </button>
                         </div>
+                        <button
+                          onClick={() => setGameState('menu')}
+                          className="text-sm font-bold text-ink/60 hover:text-ink underline underline-offset-4"
+                        >
+                          Return to Menu
+                        </button>
                       </motion.div>
                     )}
                   </div>

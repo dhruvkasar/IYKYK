@@ -71,31 +71,36 @@ Return a JSON object with:
 - fun_fact: A fun fact related to the answer in Hinglish`;
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          riddle: { type: Type.STRING, description: "The riddle text" },
-          answer: { type: Type.STRING, description: "The exact, short answer (1-3 words)" },
-          hint: { type: Type.STRING, description: "A helpful hint that doesn't give away the full answer" },
-          fun_fact: { type: Type.STRING, description: "A fun fact related to the answer" },
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            riddle: { type: Type.STRING, description: "The riddle text" },
+            answer: { type: Type.STRING, description: "The exact, short answer (1-3 words)" },
+            hint: { type: Type.STRING, description: "A helpful hint that doesn't give away the full answer" },
+            fun_fact: { type: Type.STRING, description: "A fun fact related to the answer" },
+          },
+          required: ['riddle', 'answer', 'hint', 'fun_fact'],
         },
-        required: ['riddle', 'answer', 'hint', 'fun_fact'],
       },
-    },
-  });
+    });
 
-  const text = response.text;
-  if (!text) throw new Error('No response from AI');
-  
-  return JSON.parse(text) as {
-    riddle: string;
-    answer: string;
-    hint: string;
-    fun_fact: string;
-  };
+    const text = response.text;
+    if (!text) throw new Error('No response from AI');
+    
+    return JSON.parse(text) as {
+      riddle: string;
+      answer: string;
+      hint: string;
+      fun_fact: string;
+    };
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    throw new Error('Failed to generate riddle. Please check your connection and try again.');
+  }
 }
