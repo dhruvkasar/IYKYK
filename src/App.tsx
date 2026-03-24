@@ -7,7 +7,7 @@ import { Star, Volume2, VolumeX, Sparkles, ArrowRight, Lightbulb, Trophy, Brain,
 import StickerPeel from './components/StickerPeel';
 import IntroAnimation from './components/IntroAnimation';
 
-type GameState = 'intro' | 'menu' | 'playing' | 'solved';
+type GameState = 'intro' | 'menu' | 'playing' | 'solved' | 'failed';
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -72,6 +72,7 @@ function App() {
   const [shake, setShake] = useState(false);
   const [bgmOn, setBgmOn] = useState(false);
   const [earnedStar, setEarnedStar] = useState(false);
+  const [chances, setChances] = useState(3);
   const [openCreator, setOpenCreator] = useState<string | null>(null);
 
   const handleToggleBgm = () => {
@@ -86,6 +87,7 @@ function App() {
     setError(null);
     setShowHint(false);
     setUserAnswer('');
+    setChances(3);
     try {
       const riddle = await generateRiddle(category.name, difficulty);
       setCurrentRiddle(riddle);
@@ -104,6 +106,7 @@ function App() {
     setShowHint(false);
     setUserAnswer('');
     setEarnedStar(false);
+    setChances(3);
     try {
       const riddle = await generateRiddle(category.name, difficulty);
       setCurrentRiddle(riddle);
@@ -142,9 +145,16 @@ function App() {
       setGameState('solved');
     } else {
       playWrong();
-      setStreak(0);
       setShake(true);
       setTimeout(() => setShake(false), 500);
+      
+      if (chances > 1) {
+        setChances(c => c - 1);
+      } else {
+        setChances(0);
+        setStreak(0);
+        setGameState('failed');
+      }
     }
   };
 
@@ -327,11 +337,18 @@ function App() {
                   
                   <div className={`w-full bg-white p-6 md:p-12 rounded-3xl border-4 border-ink hard-shadow mb-8 transition-transform ${shake ? 'animate-shake border-red-500' : ''}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-                      <span className={`px-4 py-1 rounded-full border-2 border-ink text-sm font-bold ${category.color} ${category.text}`}>
-                        {category.name}
-                      </span>
-                      <span className="px-4 py-1 rounded-full border-2 border-ink bg-gray-100 text-ink text-sm font-bold">
-                        {difficulty}
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`px-4 py-1 rounded-full border-2 border-ink text-sm font-bold ${category.color} ${category.text}`}>
+                          {category.name}
+                        </span>
+                        <span className="px-4 py-1 rounded-full border-2 border-ink bg-gray-100 text-ink text-sm font-bold">
+                          {difficulty}
+                        </span>
+                      </div>
+                      <span className="px-4 py-1 rounded-full border-2 border-ink bg-red-100 text-red-600 text-sm font-bold flex items-center gap-1">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <span key={i} className={i < chances ? '' : 'opacity-30 grayscale'}>❤️</span>
+                        ))}
                       </span>
                     </div>
                     
@@ -403,9 +420,15 @@ function App() {
                         animate={{ opacity: 1, y: 0 }}
                         className="flex flex-col items-center text-center"
                       >
-                        <div className="inline-block px-6 py-2 bg-mint border-2 border-ink rounded-full font-bold text-emerald-900 mb-4 transform -rotate-2">
-                          Correct! +1 Star
-                        </div>
+                        {gameState === 'solved' ? (
+                          <div className="inline-block px-6 py-2 bg-mint border-2 border-ink rounded-full font-bold text-emerald-900 mb-4 transform -rotate-2">
+                            Correct! +1 Star
+                          </div>
+                        ) : (
+                          <div className="inline-block px-6 py-2 bg-red-400 border-2 border-ink rounded-full font-bold text-white mb-4 transform -rotate-2">
+                            Out of chances! Streak lost.
+                          </div>
+                        )}
                         <p className="text-xl font-bold mb-2">Answer: <span className="text-violet">{currentRiddle.answer}</span></p>
                         <p className="text-ink/70 font-medium mb-8 bg-cream p-4 rounded-xl border-2 border-ink/10">
                           <span className="font-bold block mb-1">Fun Fact:</span>
