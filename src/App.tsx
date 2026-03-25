@@ -331,7 +331,7 @@ function App() {
             </motion.div>
           )}
 
-          {(gameState === 'playing' || gameState === 'solved') && (
+          {(gameState === 'playing' || gameState === 'solved' || gameState === 'failed') && (
             <motion.div 
               key="game"
               initial={{ opacity: 0, scale: 0.95 }}
