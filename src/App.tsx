@@ -79,8 +79,31 @@ function App() {
   const [chances, setChances] = useState(3);
   const [openCreator, setOpenCreator] = useState<string | null>(null);
   const [seenAnswers, setSeenAnswers] = useState<string[]>([]);
+  const [showGigTooltip, setShowGigTooltip] = useState(false);
+  const [hasClicked, setHasClicked] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const handleToggleBgm = async () => {
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  const handleGlobalClick = async () => {
+    if (!hasClicked) {
+      setHasClicked(true);
+      setShowGigTooltip(false);
+      if (!isPlayingBgm) {
+        const playing = await toggleBgm();
+        setBgmOn(playing);
+      }
+    }
+  };
+
+  const handleToggleBgm = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const isPlaying = await toggleBgm();
     setBgmOn(isPlaying);
   };
@@ -221,10 +244,36 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-8 px-4 overflow-x-hidden relative">
+    <div 
+      className="min-h-screen flex flex-col items-center py-8 px-4 overflow-x-hidden relative"
+      onClick={handleGlobalClick}
+    >
+      {showGigTooltip && (
+        <motion.div 
+          className="pointer-events-none fixed z-[9999] top-0 left-0 bg-ink text-cream px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap shadow-lg"
+          animate={{ 
+            x: mousePos.x + 15, 
+            y: mousePos.y + 15 
+          }}
+          transition={{
+            type: "spring",
+            stiffness: 500,
+            damping: 30,
+            mass: 0.5
+          }}
+        >
+          click to start the Gig...
+        </motion.div>
+      )}
+
       <AnimatePresence>
         {gameState === 'intro' && (
-          <IntroAnimation key="intro" onComplete={() => setGameState('menu')} />
+          <IntroAnimation key="intro" onComplete={() => {
+            setGameState('menu');
+            if (!hasClicked) {
+              setShowGigTooltip(true);
+            }
+          }} />
         )}
       </AnimatePresence>
 
