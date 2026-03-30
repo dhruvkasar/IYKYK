@@ -20,7 +20,7 @@
 * **Icons:** Lucide React
 * **AI Integration:** Google Gemini API (`@google/genai`)
 
-## 🚀Getting Started
+## Getting Started
 
 To get this project running locally on your machine, follow these steps:
 
@@ -54,11 +54,11 @@ To get this project running locally on your machine, follow these steps:
 5. **Play the game:**
    Open your browser and navigate to `http://localhost:3000` (or the port provided in your terminal).
 
-## 🎵 Credits
+## Credits
 
 * **Background Music:** "Yesterday" by [Bensound](https://www.bensound.com/)
 * **AI Engine:** Google Gemini
 
-## 📄 License
+## License
 
 This project is open-source and available under the [MIT License](LICENSE).
