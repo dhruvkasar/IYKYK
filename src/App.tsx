@@ -78,7 +78,10 @@ function App() {
   const [earnedStar, setEarnedStar] = useState(false);
   const [chances, setChances] = useState(3);
   const [openCreator, setOpenCreator] = useState<string | null>(null);
-  const [seenAnswers, setSeenAnswers] = useState<string[]>([]);
+  const [seenAnswers, setSeenAnswers] = useState<string[]>(() => {
+    const saved = localStorage.getItem('iykyk_seen_answers');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [showGigTooltip, setShowGigTooltip] = useState(false);
   const [hasClicked, setHasClicked] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -90,6 +93,10 @@ function App() {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('iykyk_seen_answers', JSON.stringify(seenAnswers));
+  }, [seenAnswers]);
 
   const handleGlobalClick = async () => {
     if (!hasClicked) {
@@ -121,8 +128,8 @@ function App() {
       setCurrentRiddle(riddle);
       setSeenAnswers(prev => {
         const newAnswers = [...prev, riddle.answer];
-        // Keep only the last 20 answers to avoid token limits
-        return newAnswers.length > 20 ? newAnswers.slice(newAnswers.length - 20) : newAnswers;
+        // Keep only the last 100 answers to avoid token limits
+        return newAnswers.length > 100 ? newAnswers.slice(newAnswers.length - 100) : newAnswers;
       });
     } catch (err: any) {
       setError(err.message || 'Failed to generate riddle. Try again!');
@@ -145,8 +152,8 @@ function App() {
       setCurrentRiddle(riddle);
       setSeenAnswers(prev => {
         const newAnswers = [...prev, riddle.answer];
-        // Keep only the last 20 answers to avoid token limits
-        return newAnswers.length > 20 ? newAnswers.slice(newAnswers.length - 20) : newAnswers;
+        // Keep only the last 100 answers to avoid token limits
+        return newAnswers.length > 100 ? newAnswers.slice(newAnswers.length - 100) : newAnswers;
       });
     } catch (err: any) {
       setError(err.message || 'Failed to generate riddle. Try again!');

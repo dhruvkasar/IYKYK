@@ -80,6 +80,7 @@ Return a JSON object with:
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        temperature: 1.2, // High temperature for maximum creativity and randomness
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
