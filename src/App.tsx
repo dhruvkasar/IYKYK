@@ -6,13 +6,17 @@ import { initAudio, playCorrect, playWrong, playHint, toggleBgm, isPlayingBgm } 
 import { Star, Volume2, VolumeX, Sparkles, ArrowRight, Lightbulb, Trophy, Brain, Microscope, Landmark, Tv, Cat, Github, Instagram, Smartphone, AlertTriangle, Share2, Flame } from 'lucide-react';
 import StickerPeel from './components/StickerPeel';
 import IntroAnimation from './components/IntroAnimation';
+import Loader from './components/Loader';
 
 type GameState = 'intro' | 'menu' | 'playing' | 'solved' | 'failed';
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  public state = { hasError: false, error: null as Error | null };
+  public props: {children: React.ReactNode};
+  
   constructor(props: {children: React.ReactNode}) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.props = props;
   }
 
   static getDerivedStateFromError(error: Error) {
@@ -74,6 +78,7 @@ function App() {
   const [earnedStar, setEarnedStar] = useState(false);
   const [chances, setChances] = useState(3);
   const [openCreator, setOpenCreator] = useState<string | null>(null);
+  const [seenAnswers, setSeenAnswers] = useState<string[]>([]);
 
   const handleToggleBgm = async () => {
     const isPlaying = await toggleBgm();
@@ -89,8 +94,13 @@ function App() {
     setUserAnswer('');
     setChances(3);
     try {
-      const riddle = await generateRiddle(category.name, difficulty);
+      const riddle = await generateRiddle(category.name, difficulty, seenAnswers);
       setCurrentRiddle(riddle);
+      setSeenAnswers(prev => {
+        const newAnswers = [...prev, riddle.answer];
+        // Keep only the last 20 answers to avoid token limits
+        return newAnswers.length > 20 ? newAnswers.slice(newAnswers.length - 20) : newAnswers;
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to generate riddle. Try again!');
       setGameState('menu');
@@ -108,8 +118,13 @@ function App() {
     setEarnedStar(false);
     setChances(3);
     try {
-      const riddle = await generateRiddle(category.name, difficulty);
+      const riddle = await generateRiddle(category.name, difficulty, seenAnswers);
       setCurrentRiddle(riddle);
+      setSeenAnswers(prev => {
+        const newAnswers = [...prev, riddle.answer];
+        // Keep only the last 20 answers to avoid token limits
+        return newAnswers.length > 20 ? newAnswers.slice(newAnswers.length - 20) : newAnswers;
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to generate riddle. Try again!');
     } finally {
@@ -343,8 +358,10 @@ function App() {
 
               {loading ? (
                 <div className="w-full bg-white p-12 rounded-3xl border-4 border-ink hard-shadow flex flex-col items-center justify-center min-h-[300px]">
-                  <div className="w-16 h-16 border-8 border-cream border-t-violet rounded-full animate-spin mb-4"></div>
-                  <h3 className="text-xl font-bold text-ink animate-pulse">Consulting the AI Oracle...</h3>
+                  <div className="mb-6">
+                    <Loader />
+                  </div>
+                  <h3 className="text-xl font-bold text-ink animate-pulse">Ruko jara sabar karo</h3>
                 </div>
               ) : currentRiddle ? (
                 <div className="w-full relative">

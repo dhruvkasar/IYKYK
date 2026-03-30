@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-export async function generateRiddle(category: string, difficulty: string) {
+export async function generateRiddle(category: string, difficulty: string, seenAnswers: string[] = []) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('API key is missing. Please configure your Gemini API key in the settings.');
@@ -8,9 +8,13 @@ export async function generateRiddle(category: string, difficulty: string) {
   
   const ai = new GoogleGenAI({ apiKey });
 
+  const avoidPrompt = seenAnswers.length > 0 
+    ? `\nCRITICAL: DO NOT generate a riddle whose answer is in this list: ${seenAnswers.join(', ')}.` 
+    : '';
+
   let prompt = `Generate a unique, creative riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}
+Difficulty: ${difficulty}${avoidPrompt}
 
 Return a JSON object with:
 - riddle: The riddle text
@@ -23,7 +27,7 @@ Make sure it's appropriate for all ages. Never repeat common riddles.`;
   if (category === 'Desi Relatable Reel Riddles') {
     prompt = `You are generating a riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}
+Difficulty: ${difficulty}${avoidPrompt}
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
 Create a riddle specifically designed for Indian Gen Z audiences.
@@ -44,7 +48,7 @@ Return a JSON object with:
   } else if (category === 'Overthinkers Club: Only Legends Solve This') {
     prompt = `You are generating a riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}
+Difficulty: ${difficulty}${avoidPrompt}
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
 Create a riddle content category titled "Overthinkers Club: Only Legends Solve This," designed specifically to attract and retain Indian Gen Z audiences by combining emotional relatability with a strong sense of identity and challenge.

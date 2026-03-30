@@ -49,11 +49,11 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
     let startX = 0,
       startY = 0;
 
-    if (initialPosition === 'center') {
+    if (typeof initialPosition === 'string' && initialPosition === 'center') {
       return;
     }
 
-    if (typeof initialPosition === 'object' && initialPosition.x !== undefined && initialPosition.y !== undefined) {
+    if (typeof initialPosition === 'object' && initialPosition !== null && 'x' in initialPosition && 'y' in initialPosition) {
       startX = initialPosition.x;
       startY = initialPosition.y;
     }
