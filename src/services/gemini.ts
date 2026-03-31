@@ -8,6 +8,7 @@ export async function generateRiddle(category: string, difficulty: string, seenA
   
   const ai = new GoogleGenAI({ apiKey });
 
+  const randomSeed = Math.floor(Math.random() * 1000000);
   const avoidPrompt = seenAnswers.length > 0 
     ? `\nCRITICAL: DO NOT generate a riddle whose answer is in this list: ${seenAnswers.join(', ')}.` 
     : '';
@@ -15,10 +16,12 @@ export async function generateRiddle(category: string, difficulty: string, seenA
   let prompt = `Generate a unique, creative riddle for a game.
 Category: ${category}
 Difficulty: ${difficulty}${avoidPrompt}
+Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 Return a JSON object with:
 - riddle: The riddle text
 - answer: The exact, short answer (1-3 words)
+- acceptable_answers: A list of 3-5 alternative valid answers, including partial matches or synonyms (e.g., if answer is 'instagram reel', include ['reel', 'reels', 'ig reel'])
 - hint: A helpful hint that doesn't give away the full answer
 - fun_fact: A fun fact related to the answer
 
@@ -28,6 +31,7 @@ Make sure it's appropriate for all ages. Never repeat common riddles.`;
     prompt = `You are generating a riddle for a game.
 Category: ${category}
 Difficulty: ${difficulty}${avoidPrompt}
+Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
 Create a riddle specifically designed for Indian Gen Z audiences.
@@ -43,12 +47,14 @@ Ensure that the overall category captures the essence of "this is so relatable" 
 Return a JSON object with:
 - riddle: The riddle text in Hinglish
 - answer: The exact, short answer (1-3 words, can be in English or common Hinglish)
+- acceptable_answers: A list of 3-5 alternative valid answers, including partial matches or synonyms (e.g., if answer is 'instagram reel', include ['reel', 'reels', 'ig reel'])
 - hint: A helpful hint in Hinglish
 - fun_fact: A fun fact related to the answer in Hinglish`;
   } else if (category === 'Overthinkers Club: Only Legends Solve This') {
     prompt = `You are generating a riddle for a game.
 Category: ${category}
 Difficulty: ${difficulty}${avoidPrompt}
+Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
 Create a riddle content category titled "Overthinkers Club: Only Legends Solve This," designed specifically to attract and retain Indian Gen Z audiences by combining emotional relatability with a strong sense of identity and challenge.
@@ -71,6 +77,7 @@ Maintain a consistent emotional depth across all riddles, while occasionally add
 Return a JSON object with:
 - riddle: The riddle text in Hinglish
 - answer: The exact, short answer (1-3 words, can be in English or common Hinglish)
+- acceptable_answers: A list of 3-5 alternative valid answers, including partial matches or synonyms (e.g., if answer is 'instagram reel', include ['reel', 'reels', 'ig reel'])
 - hint: A helpful hint in Hinglish
 - fun_fact: A fun fact related to the answer in Hinglish`;
   }
@@ -87,10 +94,15 @@ Return a JSON object with:
           properties: {
             riddle: { type: Type.STRING, description: "The riddle text" },
             answer: { type: Type.STRING, description: "The exact, short answer (1-3 words)" },
+            acceptable_answers: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING },
+              description: "Alternative valid answers and partial matches" 
+            },
             hint: { type: Type.STRING, description: "A helpful hint that doesn't give away the full answer" },
             fun_fact: { type: Type.STRING, description: "A fun fact related to the answer" },
           },
-          required: ['riddle', 'answer', 'hint', 'fun_fact'],
+          required: ['riddle', 'answer', 'acceptable_answers', 'hint', 'fun_fact'],
         },
       },
     });
@@ -101,6 +113,7 @@ Return a JSON object with:
     return JSON.parse(text) as {
       riddle: string;
       answer: string;
+      acceptable_answers: string[];
       hint: string;
       fun_fact: string;
     };

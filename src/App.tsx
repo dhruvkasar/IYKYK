@@ -68,7 +68,7 @@ function App() {
   const [freeHints, setFreeHints] = useState(1);
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [difficulty, setDifficulty] = useState('Easy');
-  const [currentRiddle, setCurrentRiddle] = useState<{ riddle: string, answer: string, hint: string, fun_fact: string } | null>(null);
+  const [currentRiddle, setCurrentRiddle] = useState<{ riddle: string, answer: string, acceptable_answers: string[], hint: string, fun_fact: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
   const [showHint, setShowHint] = useState(false);
@@ -182,6 +182,14 @@ function App() {
 
     // Check exact match after removing articles and spaces
     let isCorrect = userNoArticles === actualNoArticles;
+    
+    // Check acceptable answers provided by AI
+    if (!isCorrect && currentRiddle.acceptable_answers) {
+      isCorrect = currentRiddle.acceptable_answers.some(ans => {
+        const cleanAns = ans.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
+        return removeArticles(cleanAns) === userNoArticles;
+      });
+    }
     
     // If not exact, check if one contains the other (only if the word is reasonably long to prevent false positives)
     if (!isCorrect) {
