@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { generateRiddle } from './services/gemini';
 import { initAudio, playCorrect, playWrong, playHint, toggleBgm, isPlayingBgm } from './lib/audio';
@@ -84,15 +84,22 @@ function App() {
   });
   const [showGigTooltip, setShowGigTooltip] = useState(false);
   const [hasClicked, setHasClicked] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // High-performance cursor tracking using Framer Motion values (bypasses React state updates)
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springConfig = { damping: 30, stiffness: 500, mass: 0.5 };
+  const cursorX = useSpring(mouseX, springConfig);
+  const cursorY = useSpring(mouseY, springConfig);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+      mouseX.set(e.clientX + 15);
+      mouseY.set(e.clientY + 15);
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [mouseX, mouseY]);
 
   useEffect(() => {
     localStorage.setItem('iykyk_seen_answers', JSON.stringify(seenAnswers));
@@ -266,15 +273,9 @@ function App() {
       {showGigTooltip && (
         <motion.div 
           className="pointer-events-none fixed z-[9999] top-0 left-0 bg-ink text-cream px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap shadow-lg"
-          animate={{ 
-            x: mousePos.x + 15, 
-            y: mousePos.y + 15 
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30,
-            mass: 0.5
+          style={{ 
+            x: cursorX, 
+            y: cursorY 
           }}
         >
           click to start the Gig...
@@ -475,6 +476,7 @@ function App() {
                             value={userAnswer}
                             onChange={(e) => setUserAnswer(e.target.value)}
                             placeholder="Type your answer..."
+                            maxLength={100}
                             className="w-full pl-6 pr-28 md:pr-32 py-4 text-base md:text-lg font-bold bg-cream border-4 border-ink rounded-full focus:outline-none focus:ring-4 focus:ring-violet/30 transition-all"
                             autoFocus
                           />

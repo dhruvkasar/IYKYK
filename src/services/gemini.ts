@@ -107,8 +107,11 @@ Return a JSON object with:
       },
     });
 
-    const text = response.text;
+    let text = response.text;
     if (!text) throw new Error('No response from AI');
+    
+    // Security/Functionality: Sanitize markdown formatting if the AI wraps the JSON in code blocks
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     return JSON.parse(text) as {
       riddle: string;
