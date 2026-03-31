@@ -1,21 +1,47 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { fallbackRiddles } from '../data/fallbackRiddles';
 
 export async function generateRiddle(category: string, difficulty: string, seenAnswers: string[] = []) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('API key is missing. Please configure your Gemini API key in the settings.');
+    return getFallbackRiddle(category, difficulty, seenAnswers);
   }
   
   const ai = new GoogleGenAI({ apiKey });
 
   const randomSeed = Math.floor(Math.random() * 1000000);
   const avoidPrompt = seenAnswers.length > 0 
-    ? `\nCRITICAL: DO NOT generate a riddle whose answer is in this list: ${seenAnswers.join(', ')}.` 
+    ? `\nCRITICAL INSTRUCTION: You MUST pick a completely new answer that is NOT in this list: [${seenAnswers.join(', ')}]. Think of 5 potential answers, discard any that are in the list or similar to the list, and pick a fresh one.` 
     : '';
+
+  const randomSubTopics = [
+    "Focus on a specific emotion or feeling.",
+    "Focus on a physical object or gadget.",
+    "Focus on a social situation or interaction.",
+    "Focus on a digital habit or app feature.",
+    "Focus on a childhood memory or nostalgia.",
+    "Focus on a common daily struggle.",
+    "Focus on a psychological concept.",
+    "Focus on a relationship dynamic.",
+    "Focus on a specific place or environment.",
+    "Focus on a modern slang or internet trend."
+  ];
+  const randomTopic = randomSubTopics[Math.floor(Math.random() * randomSubTopics.length)];
+
+  const difficultyPrompt = `
+CRITICAL: The requested DIFFICULTY LEVEL is strictly "${difficulty}".
+You MUST adjust the complexity of the riddle to match this level:
+- Easy: Very obvious clues, common everyday answers.
+- Medium: Requires some lateral thinking, metaphors, less obvious.
+- Hard: Highly abstract, clever wordplay, subtle connections.
+- Genius: Extremely cryptic, niche references, requires deep "galaxy brain" thinking.
+`;
 
   let prompt = `Generate a unique, creative riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}${avoidPrompt}
+${difficultyPrompt}${avoidPrompt}
+
+To ensure variety, incorporate this specific angle/theme: ${randomTopic}
 Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 Return a JSON object with:
@@ -30,7 +56,9 @@ Make sure it's appropriate for all ages. Never repeat common riddles.`;
   if (category === 'Desi Relatable Reel Riddles') {
     prompt = `You are generating a riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}${avoidPrompt}
+${difficultyPrompt}${avoidPrompt}
+
+To ensure variety, incorporate this specific angle/theme: ${randomTopic}
 Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
@@ -53,7 +81,9 @@ Return a JSON object with:
   } else if (category === 'Overthinkers Club: Only Legends Solve This') {
     prompt = `You are generating a riddle for a game.
 Category: ${category}
-Difficulty: ${difficulty}${avoidPrompt}
+${difficultyPrompt}${avoidPrompt}
+
+To ensure variety, incorporate this specific angle/theme: ${randomTopic}
 Random Seed: ${randomSeed} (Use this to ensure completely unique generation)
 
 CRITICAL CONTEXT FOR THIS CATEGORY:
@@ -87,6 +117,7 @@ Return a JSON object with:
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        systemInstruction: "You are a master riddle creator. You never repeat riddles. You strictly follow difficulty guidelines. You always provide a list of acceptable synonyms for the answer.",
         temperature: 1.2, // High temperature for maximum creativity and randomness
         responseMimeType: 'application/json',
         responseSchema: {
@@ -122,6 +153,36 @@ Return a JSON object with:
     };
   } catch (error) {
     console.error("Gemini API Error:", error);
-    throw new Error('Failed to generate riddle. Please check your connection and try again.');
+    // Fallback to local data if API fails or quota is exceeded
+    return getFallbackRiddle(category, difficulty, seenAnswers);
   }
+}
+
+function getFallbackRiddle(category: string, difficulty: string, seenAnswers: string[]) {
+  // Filter by category and difficulty
+  let available = fallbackRiddles.filter(
+    r => r.category === category && r.difficulty === difficulty
+  );
+
+  // If none match exactly, just filter by category
+  if (available.length === 0) {
+    available = fallbackRiddles.filter(r => r.category === category);
+  }
+  
+  // If still none, use all fallbacks
+  if (available.length === 0) {
+    available = fallbackRiddles;
+  }
+
+  // Try to find one we haven't seen yet
+  let unseen = available.filter(r => !seenAnswers.includes(r.answer));
+  
+  // If we've seen them all, just pick a random one from the available pool
+  if (unseen.length === 0) {
+    unseen = available;
+  }
+
+  // Pick a random riddle from the filtered list
+  const randomIndex = Math.floor(Math.random() * unseen.length);
+  return unseen[randomIndex];
 }
