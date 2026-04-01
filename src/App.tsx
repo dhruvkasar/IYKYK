@@ -3,12 +3,18 @@ import { motion, AnimatePresence, useMotionValue, useSpring } from 'motion/react
 import confetti from 'canvas-confetti';
 import { generateRiddle } from './services/gemini';
 import { initAudio, playCorrect, playWrong, playHint, toggleBgm, isPlayingBgm } from './lib/audio';
-import { Star, Volume2, VolumeX, Sparkles, ArrowRight, Lightbulb, Trophy, Brain, Microscope, Landmark, Tv, Cat, Github, Instagram, Smartphone, AlertTriangle, Share2, Flame } from 'lucide-react';
+import { Star, Volume2, VolumeX, Sparkles, ArrowRight, Lightbulb, Trophy, Brain, Microscope, Landmark, Tv, Cat, Github, Instagram, Smartphone, AlertTriangle, Share2, Flame, User, X, FastForward } from 'lucide-react';
 import StickerPeel from './components/StickerPeel';
 import IntroAnimation from './components/IntroAnimation';
 import Loader from './components/Loader';
 
 type GameState = 'intro' | 'menu' | 'playing' | 'solved' | 'failed';
+
+interface UserStats {
+  totalStars: number;
+  maxStreak: number;
+  riddlesSolved: number;
+}
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   public state = { hasError: false, error: null as Error | null };
@@ -82,8 +88,27 @@ function App() {
     const saved = localStorage.getItem('iykyk_seen_answers');
     return saved ? JSON.parse(saved) : [];
   });
+  const [startTime, setStartTime] = useState<number>(0);
+  const [speedBonus, setSpeedBonus] = useState(false);
   const [showGigTooltip, setShowGigTooltip] = useState(false);
   const [hasClicked, setHasClicked] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<UserStats>(() => {
+    const saved = localStorage.getItem('iykyk_stats');
+    return saved ? JSON.parse(saved) : { totalStars: 0, maxStreak: 0, riddlesSolved: 0 };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('iykyk_stats', JSON.stringify(stats));
+  }, [stats]);
+
+  const getRank = (totalStars: number) => {
+    if (totalStars < 10) return { title: 'Noob', color: 'text-gray-500', bg: 'bg-gray-100' };
+    if (totalStars < 30) return { title: 'Thinker', color: 'text-blue-500', bg: 'bg-blue-100' };
+    if (totalStars < 70) return { title: 'Big Brain', color: 'text-emerald-600', bg: 'bg-emerald-100' };
+    if (totalStars < 150) return { title: 'Overthinker', color: 'text-violet', bg: 'bg-violet/20' };
+    return { title: 'Galaxy Brain', color: 'text-amber-500', bg: 'bg-amber/20' };
+  };
 
   // High-performance cursor tracking using Framer Motion values (bypasses React state updates)
   const mouseX = useMotionValue(0);
@@ -133,6 +158,8 @@ function App() {
     try {
       const riddle = await generateRiddle(category.name, difficulty, seenAnswers);
       setCurrentRiddle(riddle);
+      setStartTime(Date.now());
+      setSpeedBonus(false);
       setSeenAnswers(prev => {
         const newAnswers = [...prev, riddle.answer];
         // Keep only the last 100 answers to avoid token limits
@@ -157,6 +184,8 @@ function App() {
     try {
       const riddle = await generateRiddle(category.name, difficulty, seenAnswers);
       setCurrentRiddle(riddle);
+      setStartTime(Date.now());
+      setSpeedBonus(false);
       setSeenAnswers(prev => {
         const newAnswers = [...prev, riddle.answer];
         // Keep only the last 100 answers to avoid token limits
@@ -215,8 +244,24 @@ function App() {
         origin: { y: 0.6 },
         colors: ['#8B5CF6', '#F472B6', '#FBBF24', '#34D399']
       });
-      setStars(s => s + 1);
-      setStreak(s => s + 1);
+      
+      const timeTaken = (Date.now() - startTime) / 1000;
+      const earnedSpeedBonus = timeTaken < 10 && !showHint;
+      setSpeedBonus(earnedSpeedBonus);
+      
+      const starsEarned = earnedSpeedBonus ? 2 : 1;
+      setStars(s => s + starsEarned);
+      
+      setStreak(s => {
+        const newStreak = s + 1;
+        setStats(prev => ({
+          ...prev,
+          totalStars: prev.totalStars + starsEarned,
+          riddlesSolved: prev.riddlesSolved + 1,
+          maxStreak: Math.max(prev.maxStreak, newStreak)
+        }));
+        return newStreak;
+      });
       setEarnedStar(true);
       setGameState('solved');
     } else {
@@ -265,6 +310,15 @@ function App() {
     }
   };
 
+  const skipRiddle = async () => {
+    if (stars >= 2) {
+      setStars(s => s - 2);
+      await nextRiddle();
+    }
+  };
+
+  const currentRank = getRank(stats.totalStars);
+
   return (
     <div 
       className="min-h-screen flex flex-col items-center py-8 px-4 overflow-x-hidden relative"
@@ -294,7 +348,7 @@ function App() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="w-full max-w-4xl flex justify-between items-center mb-12">
+      <header className="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-0 mb-8 sm:mb-12">
         <button 
           onClick={() => setGameState('menu')}
           className="flex items-center gap-2 group focus:outline-none"
@@ -309,28 +363,85 @@ function App() {
             lightingIntensity={0.1}
             peelDirection={0}
           >
-            <h1 className="text-2xl font-extrabold tracking-tight bg-white px-3 py-1 rounded-lg border-2 border-ink shadow-sm">IYKYK</h1>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-white px-3 py-1 rounded-lg border-2 border-ink shadow-sm">IYKYK</h1>
           </StickerPeel>
         </button>
         
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full hard-shadow-sm border-2 border-ink">
-            <Flame className={`text-orange-500 fill-orange-500 ${streak > 0 ? 'animate-pulse' : ''}`} size={20} />
-            <span className="font-bold text-lg">{streak}</span>
+        <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-4">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowStats(true); }}
+            className={`flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full hard-shadow-sm border-2 border-ink hover-wiggle focus:outline-none ${currentRank.bg} ${currentRank.color}`}
+          >
+            <User className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="font-bold text-sm sm:text-base hidden sm:inline">{currentRank.title}</span>
+          </button>
+          <div className="flex items-center gap-1 sm:gap-2 bg-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full hard-shadow-sm border-2 border-ink">
+            <Flame className={`w-4 h-4 sm:w-5 sm:h-5 text-orange-500 fill-orange-500 ${streak > 0 ? 'animate-pulse' : ''}`} />
+            <span className="font-bold text-base sm:text-lg">{streak}</span>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full hard-shadow-sm border-2 border-ink">
-            <Star className={`text-amber fill-amber ${earnedStar ? 'animate-spin-star' : ''}`} size={20} />
-            <span className="font-bold text-lg">{stars}</span>
+          <div className="flex items-center gap-1 sm:gap-2 bg-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full hard-shadow-sm border-2 border-ink">
+            <Star className={`w-4 h-4 sm:w-5 sm:h-5 text-amber fill-amber ${earnedStar ? 'animate-spin-star' : ''}`} />
+            <span className="font-bold text-base sm:text-lg">{stars}</span>
           </div>
           <button 
             onClick={handleToggleBgm}
             aria-label={bgmOn ? "Mute background music" : "Play background music"}
-            className="w-10 h-10 bg-white rounded-full flex items-center justify-center hard-shadow-sm border-2 border-ink hover-wiggle focus:outline-none focus:ring-2 focus:ring-violet"
+            className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center hard-shadow-sm border-2 border-ink hover-wiggle focus:outline-none focus:ring-2 focus:ring-violet"
           >
-            {bgmOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            {bgmOn ? <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
         </div>
       </header>
+
+      <AnimatePresence>
+        {showStats && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-4"
+            onClick={(e) => { e.stopPropagation(); setShowStats(false); }}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white p-8 rounded-3xl border-4 border-ink hard-shadow w-full max-w-md relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setShowStats(false)}
+                className="absolute top-4 right-4 p-2 bg-cream rounded-full border-2 border-ink hover:bg-gray-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              
+              <div className="text-center mb-8">
+                <div className={`w-20 h-20 mx-auto rounded-full border-4 border-ink flex items-center justify-center mb-4 ${currentRank.bg} ${currentRank.color}`}>
+                  <Trophy size={40} />
+                </div>
+                <h2 className="text-3xl font-extrabold mb-1">Your Stats</h2>
+                <p className={`font-bold text-lg ${currentRank.color}`}>{currentRank.title}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-cream rounded-xl border-2 border-ink">
+                  <span className="font-bold text-ink/70 flex items-center gap-2"><Star size={20} className="text-amber fill-amber" /> Total Stars</span>
+                  <span className="font-extrabold text-2xl">{stats.totalStars}</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-cream rounded-xl border-2 border-ink">
+                  <span className="font-bold text-ink/70 flex items-center gap-2"><Flame size={20} className="text-orange-500 fill-orange-500" /> Max Streak</span>
+                  <span className="font-extrabold text-2xl">{stats.maxStreak}</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-cream rounded-xl border-2 border-ink">
+                  <span className="font-bold text-ink/70 flex items-center gap-2"><Brain size={20} className="text-violet" /> Riddles Solved</span>
+                  <span className="font-extrabold text-2xl">{stats.riddlesSolved}</span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="w-full max-w-2xl flex-1 flex flex-col items-center">
         <AnimatePresence mode="wait">
@@ -342,24 +453,24 @@ function App() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full flex flex-col items-center"
             >
-              <div className="relative mb-12 text-center">
-                <Sparkles className="absolute -top-6 -left-8 text-amber animate-pulse" size={32} />
-                <Sparkles className="absolute -bottom-4 -right-8 text-hot-pink animate-pulse" size={24} />
-                <h2 className="text-5xl md:text-7xl font-extrabold text-ink mb-4 leading-tight">
+              <div className="relative mb-8 sm:mb-12 text-center">
+                <Sparkles className="absolute -top-4 sm:-top-6 -left-4 sm:-left-8 text-amber animate-pulse w-6 h-6 sm:w-8 sm:h-8" />
+                <Sparkles className="absolute -bottom-2 sm:-bottom-4 -right-4 sm:-right-8 text-hot-pink animate-pulse w-5 h-5 sm:w-6 sm:h-6" />
+                <h2 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-ink mb-2 sm:mb-4 leading-tight">
                   IYKYK <br/> RIDDLES
                 </h2>
-                <p className="text-lg font-medium text-ink/70">
+                <p className="text-base sm:text-lg font-medium text-ink/70 px-4">
                   Infinite riddles. Earn stars. Unlock your genius.
                 </p>
               </div>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-xl border-2 border-red-300 font-medium">
+                <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-xl border-2 border-red-300 font-medium text-sm sm:text-base">
                   {error}
                 </div>
               )}
 
-              <div className="w-full bg-white p-6 md:p-8 rounded-3xl border-4 border-ink hard-shadow mb-8">
+              <div className="w-full bg-white p-4 sm:p-6 md:p-8 rounded-3xl border-4 border-ink hard-shadow mb-8">
                 <h3 className="text-xl font-bold mb-4">1. Choose Category</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                   {CATEGORIES.map(cat => (
@@ -434,24 +545,24 @@ function App() {
                   <div className="absolute -inset-4 bg-violet/20 rounded-[40px] -z-10 transform rotate-2"></div>
                   <div className="absolute -inset-4 bg-amber/20 rounded-[40px] -z-10 transform -rotate-2"></div>
                   
-                  <div className={`w-full bg-white p-6 md:p-12 rounded-3xl border-4 border-ink hard-shadow mb-8 transition-transform ${shake ? 'animate-shake border-red-500' : ''}`}>
+                  <div className={`w-full bg-white p-4 sm:p-6 md:p-12 rounded-3xl border-4 border-ink hard-shadow mb-8 transition-transform ${shake ? 'animate-shake border-red-500' : ''}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
                       <div className="flex flex-wrap gap-2">
-                        <span className={`px-4 py-1 rounded-full border-2 border-ink text-sm font-bold ${category.color} ${category.text}`}>
+                        <span className={`px-3 sm:px-4 py-1 rounded-full border-2 border-ink text-xs sm:text-sm font-bold ${category.color} ${category.text}`}>
                           {category.name}
                         </span>
-                        <span className="px-4 py-1 rounded-full border-2 border-ink bg-gray-100 text-ink text-sm font-bold">
+                        <span className="px-3 sm:px-4 py-1 rounded-full border-2 border-ink bg-gray-100 text-ink text-xs sm:text-sm font-bold">
                           {difficulty}
                         </span>
                       </div>
-                      <span className="px-4 py-1 rounded-full border-2 border-ink bg-red-100 text-red-600 text-sm font-bold flex items-center gap-1">
+                      <span className="px-3 sm:px-4 py-1 rounded-full border-2 border-ink bg-red-100 text-red-600 text-xs sm:text-sm font-bold flex items-center gap-1">
                         {Array.from({ length: 3 }).map((_, i) => (
                           <span key={i} className={i < chances ? '' : 'opacity-30 grayscale'}>❤️</span>
                         ))}
                       </span>
                     </div>
                     
-                    <h2 className="text-xl md:text-3xl font-bold leading-relaxed mb-8 text-center">
+                    <h2 className="text-lg sm:text-xl md:text-3xl font-bold leading-relaxed mb-6 sm:mb-8 text-center">
                       "{currentRiddle.riddle}"
                     </h2>
 
@@ -460,10 +571,10 @@ function App() {
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="mb-8 p-4 bg-amber/20 border-2 border-amber rounded-xl flex items-start gap-3"
+                          className="mb-6 sm:mb-8 p-3 sm:p-4 bg-amber/20 border-2 border-amber rounded-xl flex items-start gap-2 sm:gap-3"
                         >
-                          <Lightbulb className="text-amber shrink-0 mt-1" />
-                          <p className="font-medium text-amber-900">{currentRiddle.hint}</p>
+                          <Lightbulb className="text-amber shrink-0 mt-0.5 sm:mt-1 w-4 h-4 sm:w-6 sm:h-6" />
+                          <p className="font-medium text-amber-900 text-sm sm:text-base">{currentRiddle.hint}</p>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -477,19 +588,19 @@ function App() {
                             onChange={(e) => setUserAnswer(e.target.value)}
                             placeholder="Type your answer..."
                             maxLength={100}
-                            className="w-full pl-6 pr-28 md:pr-32 py-4 text-base md:text-lg font-bold bg-cream border-4 border-ink rounded-full focus:outline-none focus:ring-4 focus:ring-violet/30 transition-all"
+                            className="w-full pl-4 sm:pl-6 pr-24 sm:pr-28 md:pr-32 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-bold bg-cream border-4 border-ink rounded-full focus:outline-none focus:ring-4 focus:ring-violet/30 transition-all"
                             autoFocus
                           />
                           <button 
                             type="submit"
                             disabled={!userAnswer.trim()}
-                            className="absolute right-2 top-2 bottom-2 px-4 md:px-6 bg-violet text-white font-bold rounded-full border-2 border-ink hover:bg-violet/90 transition-all active:scale-95 text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="absolute right-1.5 sm:right-2 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 px-3 sm:px-4 md:px-6 bg-violet text-white font-bold rounded-full border-2 border-ink hover:bg-violet/90 transition-all active:scale-95 text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Submit
                           </button>
                         </div>
                         
-                        <div className="flex flex-wrap justify-between items-center gap-4 mt-2">
+                        <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 mt-2 w-full">
                           <button
                             type="button"
                             onClick={() => {
@@ -497,26 +608,42 @@ function App() {
                               setStreak(0);
                               setGameState('failed');
                             }}
-                            className="text-sm font-bold text-ink/60 hover:text-ink underline underline-offset-4"
+                            className="text-xs sm:text-sm font-bold text-ink/60 hover:text-ink underline underline-offset-4 w-full sm:w-auto text-center py-2 sm:py-0"
                           >
                             Give up
                           </button>
                           
-                          {!showHint && (
+                          <div className="flex flex-wrap justify-center sm:justify-end gap-2 w-full sm:w-auto">
                             <button
                               type="button"
-                              onClick={useHint}
-                              disabled={stars < 1 && freeHints < 1}
-                              className={`text-sm font-bold flex items-center gap-1 px-3 py-1 rounded-full border-2 ${
-                                stars >= 1 || freeHints >= 1
-                                  ? 'border-ink bg-amber/20 text-amber-900 hover:bg-amber/30' 
+                              onClick={skipRiddle}
+                              disabled={stars < 2}
+                              className={`text-xs sm:text-sm font-bold flex items-center justify-center gap-1 px-3 py-1.5 sm:py-1 rounded-full border-2 flex-1 sm:flex-none ${
+                                stars >= 2
+                                  ? 'border-ink bg-blue-100 text-blue-900 hover:bg-blue-200' 
                                   : 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
                               }`}
                             >
-                              <Lightbulb size={16} />
-                              {freeHints > 0 ? 'Hint (1 Free)' : <>Hint (Costs 1 <Star size={12} className="inline fill-current" />)</>}
+                              <FastForward className="w-3 h-3 sm:w-4 sm:h-4" />
+                              Skip (2 <Star className="w-3 h-3 inline fill-current" />)
                             </button>
-                          )}
+                            
+                            {!showHint && (
+                              <button
+                                type="button"
+                                onClick={useHint}
+                                disabled={stars < 1 && freeHints < 1}
+                                className={`text-xs sm:text-sm font-bold flex items-center justify-center gap-1 px-3 py-1.5 sm:py-1 rounded-full border-2 flex-1 sm:flex-none ${
+                                  stars >= 1 || freeHints >= 1
+                                    ? 'border-ink bg-amber/20 text-amber-900 hover:bg-amber/30' 
+                                    : 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                }`}
+                              >
+                                <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {freeHints > 0 ? 'Hint (1 Free)' : <>Hint (1 <Star className="w-3 h-3 inline fill-current" />)</>}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </form>
                     ) : (
@@ -526,16 +653,23 @@ function App() {
                         className="flex flex-col items-center text-center"
                       >
                         {gameState === 'solved' ? (
-                          <div className="inline-block px-6 py-2 bg-mint border-2 border-ink rounded-full font-bold text-emerald-900 mb-4 transform -rotate-2">
-                            Correct! +1 Star
+                          <div className="flex flex-col items-center gap-2 mb-4">
+                            <div className="inline-block px-4 sm:px-6 py-1.5 sm:py-2 bg-mint border-2 border-ink rounded-full font-bold text-emerald-900 text-sm sm:text-base transform -rotate-2">
+                              Correct! +1 Star
+                            </div>
+                            {speedBonus && (
+                              <div className="inline-block px-3 sm:px-4 py-1 bg-amber border-2 border-ink rounded-full font-bold text-amber-900 text-xs sm:text-sm transform rotate-2 animate-pulse">
+                                ⚡ Speed Bonus! +1 Star
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="inline-block px-6 py-2 bg-red-400 border-2 border-ink rounded-full font-bold text-white mb-4 transform -rotate-2">
+                          <div className="inline-block px-4 sm:px-6 py-1.5 sm:py-2 bg-red-400 border-2 border-ink rounded-full font-bold text-white mb-4 text-sm sm:text-base transform -rotate-2">
                             Out of chances! Streak lost.
                           </div>
                         )}
-                        <p className="text-xl font-bold mb-2">Answer: <span className="text-violet">{currentRiddle.answer}</span></p>
-                        <p className="text-ink/70 font-medium mb-8 bg-cream p-4 rounded-xl border-2 border-ink/10">
+                        <p className="text-lg sm:text-xl font-bold mb-2">Answer: <span className="text-violet">{currentRiddle.answer}</span></p>
+                        <p className="text-sm sm:text-base text-ink/70 font-medium mb-6 sm:mb-8 bg-cream p-3 sm:p-4 rounded-xl border-2 border-ink/10 text-left sm:text-center">
                           <span className="font-bold block mb-1">Fun Fact:</span>
                           {currentRiddle.fun_fact}
                         </p>
@@ -543,15 +677,15 @@ function App() {
                         <div className="flex flex-col sm:flex-row gap-3 w-full mb-4">
                           <button
                             onClick={shareRiddle}
-                            className="flex-1 py-4 bg-white text-ink text-lg font-bold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
+                            className="flex-1 py-3 sm:py-4 bg-white text-ink text-base sm:text-lg font-bold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
                           >
-                            <Share2 size={20} /> SHARE
+                            <Share2 className="w-4 h-4 sm:w-5 sm:h-5" /> SHARE
                           </button>
                           <button
                             onClick={nextRiddle}
-                            className="flex-[2] py-4 bg-hot-pink text-white text-xl font-extrabold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
+                            className="flex-[2] py-3 sm:py-4 bg-hot-pink text-white text-lg sm:text-xl font-extrabold rounded-full border-4 border-ink hard-shadow-hover transition-all flex items-center justify-center gap-2"
                           >
-                            NEXT RIDDLE <ArrowRight />
+                            NEXT RIDDLE <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
                           </button>
                         </div>
                         <button
